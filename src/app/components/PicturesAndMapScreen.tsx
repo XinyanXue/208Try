@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import campusMapImage from "../../../campus-map.jpg";
 import { PhoneShell, StatusBar, ComicCard, Burst } from "./PhoneShell";
 import { BottomNav } from "./BottomNav";
 import { IconBack, IconChevronLeft, IconChevronRight, IconPin, IconNavigation, IconChevronRight as IconArrow } from "./ComicIcons";
@@ -568,7 +569,7 @@ export function PicturesAndMapScreen() {
         <ComicCard style={{ overflow: "hidden", position: "relative", backgroundColor: C.ice, marginBottom: "18px", padding: "10px" }}>
           {mapTab === "地图" ? (
             <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: `2px solid ${C.navy}`, boxShadow: `3px 3px 0 ${C.navy}`, backgroundColor: "#E8EEF6" }}>
-              <img src="/campus-map.jpg" alt="XJTLU 校园地图" style={{ width: "100%", height: "auto", display: "block" }} />
+              <img src={campusMapImage} alt="XJTLU 校园地图" style={{ width: "100%", height: "auto", display: "block" }} />
               {campusMapHotspots.map((spot) => (
                 <button
                   key={spot.id}
