@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
+import * as L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { PhoneShell, StatusBar, ComicCard, Burst } from "./PhoneShell";
 import { BottomNav } from "./BottomNav";
 import { IconBack, IconChevronLeft, IconChevronRight, IconPin, IconNavigation, IconChevronRight as IconArrow } from "./ComicIcons";
@@ -90,13 +92,263 @@ const photos = [
   { id: 5, title: "运动场",    url: "https://images.unsplash.com/photo-1766459710529-c9fdb8023ecb?w=800&q=80", tag: "运动" },
 ];
 
-const mapPins = [
-  { id: 1, label: "图书馆",   x: 38, y: 28, color: C.royal  },
-  { id: 2, label: "中心广场", x: 55, y: 46, color: C.sky    },
-  { id: 3, label: "教学楼",   x: 24, y: 55, color: C.purple },
-  { id: 4, label: "食堂",     x: 70, y: 60, color: C.coral  },
-  { id: 5, label: "体育馆",   x: 48, y: 72, color: C.mint   },
+const campusMapHotspots = [
+  { id: "ls", label: "LS", fullName: "Life Sciences", x: 32, y: 22, color: "#2d8f47" },
+  { id: "fb", label: "FB", fullName: "Foundation Building", x: 41, y: 42, color: "#5ba3d4" },
+  { id: "cb", label: "CB", fullName: "Central Building", x: 42, y: 56, color: "#17316f" },
+  { id: "sa", label: "SA", fullName: "Science Building A", x: 54, y: 51, color: "#6abf69" },
+  { id: "sb", label: "SB", fullName: "Science Building B", x: 54, y: 55, color: "#6abf69" },
+  { id: "sc", label: "SC", fullName: "Science Building C", x: 54, y: 59, color: "#6abf69" },
+  { id: "sd", label: "SD", fullName: "Science Building D", x: 54, y: 63, color: "#6abf69" },
+  { id: "pb", label: "PB", fullName: "Public Building", x: 61, y: 53, color: "#e8a23a" },
+  { id: "ma", label: "MA", fullName: "Mathematics Building A", x: 67, y: 53, color: "#7e57c2" },
+  { id: "mb", label: "MB", fullName: "Mathematics Building B", x: 67, y: 57, color: "#7e57c2" },
+  { id: "ee", label: "EE", fullName: "Electrical & Electronic", x: 61, y: 63, color: "#26a69a" },
+  { id: "eb", label: "EB", fullName: "Engineering Building", x: 68, y: 61, color: "#3d8f5a" },
+  { id: "ir", label: "IR", fullName: "International Research Centre", x: 54, y: 73, color: "#c62828" },
+  { id: "ia", label: "IA", fullName: "International Academic Exchange", x: 63, y: 75, color: "#ef6c2a" },
+  { id: "hs", label: "HS", fullName: "Humanities & Social Sciences", x: 63, y: 83, color: "#8d6e63" },
+  { id: "es", label: "ES", fullName: "Emerging Sciences", x: 53, y: 92, color: "#d84315" },
+  { id: "db", label: "DB", fullName: "Design Building", x: 65, y: 90, color: "#795548" },
+  { id: "bs", label: "BS", fullName: "International Business School", x: 51, y: 83, color: "#c62828" },
+  { id: "as", label: "AS", fullName: "Film & Creative Technology", x: 45, y: 71, color: "#f9a825" },
+  { id: "gym", label: "GYM", fullName: "Gymnasium", x: 73, y: 75, color: "#263238" },
 ];
+
+interface CampusLocationInfo {
+  type: string;
+  title: string;
+  subtitle: string;
+  desc: string;
+  story: string;
+  tags: string[];
+  bestFor: string;
+  time: string;
+  access: string;
+}
+
+const campusLocationInfo: Record<string, CampusLocationInfo> = {
+  ls: {
+    type: "📍 North campus",
+    title: "Life Sciences Building",
+    subtitle: "Life Sciences",
+    desc: "A seven-storey hub for industry-integrated education, combining authentic industrial scenarios with immersive virtual teaching environments.",
+    story: "The LS building is divided into the north building and the south building. LSS is the south building and LSN is the north building.",
+    tags: ["Lab", "North Campus", "Science"],
+    bestFor: "STEM labs · research visits",
+    time: "5–8 min",
+    access: "Verify lifts and ramps on site",
+  },
+  fb: {
+    type: "📍 Central campus",
+    title: "Foundation Building",
+    subtitle: "Foundation Building",
+    desc: "A core facility supporting undergraduate general education and foundational discipline teaching, and a major venue for EAP classes.",
+    story: "FB offers many small classrooms and open discussion areas. The ground floor also houses a convenience store and a Subway.",
+    tags: ["Teaching", "Core Courses", "Landmark"],
+    bestFor: "New students · core courses",
+    time: "5–10 min",
+    access: "Verify lifts and ramps on site",
+  },
+  cb: {
+    type: "📍 Landmark",
+    title: "Central Building",
+    subtitle: "Central Building",
+    desc: "As the campus core functional zone, it brings together career development services, academic support, and student leisure.",
+    story: "The library floors provide study desks, and the building includes key student services such as counselling, IT helpdesk, career center, and one-stop service.",
+    tags: ["Iconic", "Campus Story", "Photo Spot"],
+    bestFor: "All visitors · main story stop",
+    time: "8–12 min",
+    access: "Lifts and ramps—verify on site",
+  },
+  sa: {
+    type: "📍 Science cluster",
+    title: "Science Building A",
+    subtitle: "Science A",
+    desc: "Primarily accommodates the School of Science while providing laboratories, offices, and lecture theatres for multi-disciplinary use.",
+    story: "For rooms on the first floor, the west entrance (facing CB) is more direct. The east entrance leads directly to elevators.",
+    tags: ["Science", "Cluster A"],
+    bestFor: "STEM classes",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  sb: {
+    type: "📍 Science cluster",
+    title: "Science Building B",
+    subtitle: "Science B",
+    desc: "Primarily accommodates the School of Science while providing laboratories, offices, and lecture theatres for multi-disciplinary use.",
+    story: "For first-floor rooms, the east entrance (facing North Foundation) is more direct. The west entrance leads to elevators.",
+    tags: ["Science", "Cluster B"],
+    bestFor: "Labs and seminars",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  sc: {
+    type: "📍 Science cluster",
+    title: "Science Building C",
+    subtitle: "Science C",
+    desc: "Primarily accommodates the School of Science while providing laboratories, offices, and lecture theatres for multi-disciplinary use.",
+    story: "For first-floor rooms, enter from the west side facing CB. The east entrance connects more directly to elevators.",
+    tags: ["Science", "Cluster C"],
+    bestFor: "Group work · study hops",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  sd: {
+    type: "📍 Science cluster",
+    title: "Science Building D",
+    subtitle: "Science D",
+    desc: "Primarily accommodates the School of Science while providing laboratories, offices, and lecture theatres for multi-disciplinary use.",
+    story: "For first-floor rooms, the east entrance (towards North Foundation) is usually easier. The west entrance leads to elevators.",
+    tags: ["Science", "Cluster D"],
+    bestFor: "Moving between clusters",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  pb: {
+    type: "📍 Public services",
+    title: "Public Building",
+    subtitle: "Public Building",
+    desc: "Functions as a central academic facility featuring large-capacity lecture theatres, classrooms, offices, and meeting rooms.",
+    story: "The entrance is located on the east side, adjacent to the shop.",
+    tags: ["Public", "Events", "Services"],
+    bestFor: "Guests · event info",
+    time: "6–10 min",
+    access: "Verify on site",
+  },
+  ma: {
+    type: "📍 Mathematics",
+    title: "Mathematics Building A",
+    subtitle: "Mathematics A",
+    desc: "Contains offices, classrooms, and lecture theatres, primarily supporting the School of Mathematics and Physics.",
+    story: "MA and MB are interconnected, allowing access to the other building from every floor.",
+    tags: ["Math", "Academic"],
+    bestFor: "Math and statistics",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  mb: {
+    type: "📍 Mathematics",
+    title: "Mathematics Building B",
+    subtitle: "Mathematics B",
+    desc: "Contains offices, classrooms, and lecture theatres, primarily supporting the School of Mathematics and Physics.",
+    story: "MA and MB are interconnected, allowing access to the other building from every floor.",
+    tags: ["Math", "Academic"],
+    bestFor: "Seminars · office hours",
+    time: "5–8 min",
+    access: "Verify on site",
+  },
+  ee: {
+    type: "📍 Engineering",
+    title: "Electrical & Electronic Engineering",
+    subtitle: "EEE Building",
+    desc: "Features engineering laboratories, classrooms, and lecture halls, serving as a primary facility for the School of Advanced Technology.",
+    story: "EE and EB are connected. Transit to the adjacent building is available on specific floors.",
+    tags: ["EEE", "Lab", "Innovation"],
+    bestFor: "Engineering visits · lab tours",
+    time: "8–12 min",
+    access: "Lab areas may need booking—verify",
+  },
+  eb: {
+    type: "📍 Engineering",
+    title: "Engineering Building",
+    subtitle: "Engineering Building",
+    desc: "Provides classrooms and lecture theatres alongside specialized studios for Civil Engineering and Industrial Design.",
+    story: "EE and EB are connected. Transit to the adjacent building is available on specific floors.",
+    tags: ["Engineering", "Project-based"],
+    bestFor: "Project studios · workshops",
+    time: "8–12 min",
+    access: "Verify on site",
+  },
+  ir: {
+    type: "📍 South Campus",
+    title: "International Research Centre",
+    subtitle: "International Research Centre",
+    desc: "A functional building for scientific cooperation and international exchange, often used by research groups and visiting scholars.",
+    story: "The entrance is located on the east-south side, near the right side of the underground passage.",
+    tags: ["Research", "International"],
+    bestFor: "Academic visits and activity discussions",
+    time: "6–10 min",
+    access: "All floors",
+  },
+  ia: {
+    type: "📍 South Campus",
+    title: "International Academic Exchange & Collaboration Centre",
+    subtitle: "International Academic Exchange",
+    desc: "An important venue for hosting conferences, receptions, and cross-cultural academic activities.",
+    story: "The entrance is located on the west-south side, near the left side of the underground passage.",
+    tags: ["Conference", "Bilingual", "Guests"],
+    bestFor: "International visitor & conference reception",
+    time: "6–10 min",
+    access: "All floors",
+  },
+  hs: {
+    type: "📍 South Campus",
+    title: "Humanities & Social Sciences Building",
+    subtitle: "Humanities & Social Sciences",
+    desc: "A key humanities teaching area with seminar-style spaces and social science learning support.",
+    story: "This area often hosts reading clubs and debate activities.",
+    tags: ["Humanities", "Seminar", "Culture"],
+    bestFor: "Humanities courses",
+    time: "6–10 min",
+    access: "All floors",
+  },
+  es: {
+    type: "📍 South Campus",
+    title: "Emerging & Interdisciplinary Sciences Building",
+    subtitle: "Emerging & Interdisciplinary Science",
+    desc: "An interdisciplinary exploration space emphasizing cross-disciplinary collaboration.",
+    story: "The entrance is located on the east-north side.",
+    tags: ["Interdisciplinary", "Future"],
+    bestFor: "Environmental and interdisciplinary majors",
+    time: "6–10 min",
+    access: "All floors",
+  },
+  db: {
+    type: "📍 South Campus",
+    title: "Design Building",
+    subtitle: "Design Building",
+    desc: "Workshops, exhibition areas, and review spaces for design-major students.",
+    story: "The entrance is on the west-north side, behind HS.",
+    tags: ["Design", "Studio", "Exhibition"],
+    bestFor: "Design majors & exhibitions",
+    time: "8–14 min",
+    access: "Studio areas follow department rules",
+  },
+  bs: {
+    type: "📍 South Campus",
+    title: "International Business School Suzhou",
+    subtitle: "IBSS at XJTLU",
+    desc: "A key building for business education and case teaching, connecting industry practice with international curricula.",
+    story: "Main entrance is on the east side; north and south entries are also available.",
+    tags: ["Business", "Case Study", "Career"],
+    bestFor: "Business students & career exploration",
+    time: "8–12 min",
+    access: "All floors",
+  },
+  as: {
+    type: "📍 South Campus",
+    title: "Film & Creative Technology",
+    subtitle: "Film and Creative Technology Building",
+    desc: "A practical teaching space integrating film, creativity, and technology for media-related majors.",
+    story: "The entrance is located on the east-south side, behind IR.",
+    tags: ["Media", "Creative", "Studio"],
+    bestFor: "Film, TV, and creative courses",
+    time: "8–12 min",
+    access: "Most floors open; some rooms may be closed",
+  },
+  gym: {
+    type: "🎮 South Campus",
+    title: "Gymnasium",
+    subtitle: "GYM",
+    desc: "A large indoor sports and event venue, supporting campus sports culture and collective activities.",
+    story: "Entrances are available on both west and east sides.",
+    tags: ["Sports", "Events", "Wellness"],
+    bestFor: "Sports and event viewing",
+    time: "20–40 min",
+    access: "By appointment",
+  },
+};
 
 type MapTab = "地图" | "实时定位";
 
@@ -104,11 +356,133 @@ export function PicturesAndMapScreen() {
   const navigate = useNavigate();
   const [cur, setCur] = useState(0);
   const [mapTab, setMapTab] = useState<MapTab>("地图");
+  const [activeHotspotId, setActiveHotspotId] = useState("cb");
+  const [locationStatus, setLocationStatus] = useState("点击“开始定位”获取实时位置");
 
   /* search state */
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Classroom | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const leafletHostRef = useRef<HTMLDivElement | null>(null);
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.CircleMarker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const firstFixRef = useRef(false);
+
+  const XJTLU_CENTER: [number, number] = [31.2718, 120.7415];
+
+  const ensureLeafletMap = () => {
+    if (leafletMapRef.current) return leafletMapRef.current;
+    if (!leafletHostRef.current) return null;
+
+    const map = L.map(leafletHostRef.current, { scrollWheelZoom: true }).setView(XJTLU_CENTER, 16);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    L.marker(XJTLU_CENTER).addTo(map).bindPopup("XJTLU 校园参考点");
+    leafletMapRef.current = map;
+    return map;
+  };
+
+  const stopTracking = (message = "已停止定位") => {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    firstFixRef.current = false;
+    setLocationStatus(message);
+  };
+
+  const updateUserPosition = (lat: number, lng: number, accuracy: number) => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+
+    const acc = Math.max(Number(accuracy) || 0, 5);
+    if (userMarkerRef.current && accuracyCircleRef.current) {
+      userMarkerRef.current.setLatLng([lat, lng]);
+      accuracyCircleRef.current.setLatLng([lat, lng]);
+      accuracyCircleRef.current.setRadius(acc);
+    } else {
+      userMarkerRef.current = L.circleMarker([lat, lng], {
+        radius: 7,
+        color: "#17316f",
+        fillColor: "#5aa6ff",
+        fillOpacity: 0.95,
+        weight: 2,
+      }).addTo(map);
+      accuracyCircleRef.current = L.circle([lat, lng], {
+        radius: acc,
+        color: "#5aa6ff",
+        fillColor: "#5aa6ff",
+        fillOpacity: 0.12,
+        weight: 1,
+      }).addTo(map);
+    }
+
+    if (!firstFixRef.current) {
+      map.setView([lat, lng], Math.max(map.getZoom(), 17));
+      firstFixRef.current = true;
+    } else {
+      map.panTo([lat, lng], { animate: false });
+    }
+    setLocationStatus(`实时定位中，精度约 ${Math.round(acc)} 米`);
+  };
+
+  const startTracking = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("当前浏览器不支持定位功能");
+      return;
+    }
+
+    const map = ensureLeafletMap();
+    if (!map) return;
+    if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+    firstFixRef.current = false;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        updateUserPosition(latitude, longitude, accuracy);
+      },
+      (err) => {
+        const status =
+          err.code === 1
+            ? "定位权限被拒绝，请在浏览器中允许定位"
+            : err.code === 2
+              ? "位置信号不可用，请稍后重试"
+              : err.code === 3
+                ? "定位超时，请在室外或网络更稳定环境重试"
+                : "无法获取实时位置";
+        setLocationStatus(status);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 },
+    );
+    setLocationStatus("正在获取当前位置...");
+  };
+
+  useEffect(() => {
+    if (mapTab === "实时定位") {
+      const map = ensureLeafletMap();
+      if (map) {
+        window.setTimeout(() => map.invalidateSize(), 120);
+      }
+    } else {
+      stopTracking("已切换回校园地图");
+    }
+  }, [mapTab]);
+
+  useEffect(() => {
+    return () => {
+      stopTracking("已停止定位");
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, []);
 
   const filtered = query.trim().length > 0
     ? classrooms.filter(
@@ -120,6 +494,7 @@ export function PicturesAndMapScreen() {
 
   const prev = () => setCur((c) => (c - 1 + photos.length) % photos.length);
   const next = () => setCur((c) => (c + 1) % photos.length);
+  const activeLocation = campusLocationInfo[activeHotspotId];
 
   return (
     <PhoneShell bg={C.ice}>
@@ -190,44 +565,119 @@ export function PicturesAndMapScreen() {
           ))}
         </div>
 
-        <ComicCard style={{ height: "200px", overflow: "hidden", position: "relative", backgroundColor: C.ice, marginBottom: "18px" }}>
-          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} viewBox="0 0 390 200" preserveAspectRatio="none">
-            <line x1="50" y1="0" x2="50" y2="200" stroke={C.pale} strokeWidth="10" />
-            <line x1="340" y1="0" x2="340" y2="200" stroke={C.pale} strokeWidth="10" />
-            <line x1="0" y1="50" x2="390" y2="50" stroke={C.pale} strokeWidth="10" />
-            <line x1="0" y1="160" x2="390" y2="160" stroke={C.pale} strokeWidth="10" />
-            <line x1="50" y1="0" x2="50" y2="200" stroke={C.navy} strokeWidth="1.5" strokeDasharray="4,4" />
-            <line x1="340" y1="0" x2="340" y2="200" stroke={C.navy} strokeWidth="1.5" strokeDasharray="4,4" />
-            <line x1="0" y1="50" x2="390" y2="50" stroke={C.navy} strokeWidth="1.5" strokeDasharray="4,4" />
-            <line x1="0" y1="160" x2="390" y2="160" stroke={C.navy} strokeWidth="1.5" strokeDasharray="4,4" />
-            <rect x="64" y="62" width="262" height="87" rx="12" fill={C.white} stroke={C.navy} strokeWidth="2" />
-            <rect x="78" y="74" width="54" height="32" rx="6" fill={C.pale} stroke={C.navy} strokeWidth="1.5" />
-            <rect x="156" y="68" width="74" height="42" rx="6" fill={C.sky} stroke={C.navy} strokeWidth="1.5" opacity="0.7" />
-            <rect x="254" y="78" width="56" height="28" rx="6" fill={C.pale} stroke={C.navy} strokeWidth="1.5" />
-            <rect x="96" y="116" width="38" height="26" rx="6" fill={C.mint} stroke={C.navy} strokeWidth="1.5" opacity="0.7" />
-            <rect x="210" y="112" width="48" height="30" rx="6" fill={C.yellow} stroke={C.navy} strokeWidth="1.5" opacity="0.7" />
-            <path d="M195 62 L195 148" stroke={C.navy} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="4,4" />
-            <path d="M64 105 L326 105" stroke={C.navy} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="4,4" />
-          </svg>
-          {mapPins.map((pin) => (
-            <div key={pin.id} style={{ position: "absolute", left: `${pin.x}%`, top: `${pin.y}%`, transform: "translate(-50%,-100%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: pin.color, border: `2px solid ${C.navy}`, boxShadow: `2px 2px 0 ${C.navy}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <IconPin size={11} color="white" />
+        <ComicCard style={{ overflow: "hidden", position: "relative", backgroundColor: C.ice, marginBottom: "18px", padding: "10px" }}>
+          {mapTab === "地图" ? (
+            <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: `2px solid ${C.navy}`, boxShadow: `3px 3px 0 ${C.navy}`, backgroundColor: "#E8EEF6" }}>
+              <img src="/campus-map.jpg" alt="XJTLU 校园地图" style={{ width: "100%", height: "auto", display: "block" }} />
+              {campusMapHotspots.map((spot) => (
+                <button
+                  key={spot.id}
+                  type="button"
+                  onClick={() => setActiveHotspotId(spot.id)}
+                  aria-label={`${spot.fullName} ${spot.label}`}
+                  style={{
+                    position: "absolute",
+                    left: `${spot.x}%`,
+                    top: `${spot.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    minWidth: "24px",
+                    minHeight: "22px",
+                    borderRadius: "7px",
+                    border: activeHotspotId === spot.id ? `2px solid ${C.yellow}` : "2px solid rgba(255,255,255,0.95)",
+                    backgroundColor: spot.color,
+                    color: C.white,
+                    fontSize: "9px",
+                    fontWeight: 900,
+                    padding: "0 5px",
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    boxShadow: activeHotspotId === spot.id ? `0 0 0 2px ${C.navy}, 0 6px 14px rgba(0,0,0,0.28)` : "0 4px 12px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {spot.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <div
+                ref={leafletHostRef}
+                style={{
+                  width: "100%",
+                  height: "220px",
+                  borderRadius: "12px",
+                  border: `2px solid ${C.navy}`,
+                  boxShadow: `3px 3px 0 ${C.navy}`,
+                  overflow: "hidden",
+                }}
+              />
+              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                <button
+                  type="button"
+                  onClick={startTracking}
+                  style={{ flex: 1, height: "36px", borderRadius: "10px", border: `2px solid ${C.navy}`, backgroundColor: C.royal, color: C.white, fontSize: "12px", fontWeight: 800, boxShadow: `2px 2px 0 ${C.navy}`, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: "pointer" }}
+                >
+                  <IconNavigation size={14} color={C.white} />
+                  开始定位
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stopTracking("已停止定位")}
+                  style={{ flex: 1, height: "36px", borderRadius: "10px", border: `2px solid ${C.navy}`, backgroundColor: C.white, color: C.navy, fontSize: "12px", fontWeight: 800, boxShadow: `2px 2px 0 ${C.navy}`, cursor: "pointer" }}
+                >
+                  停止定位
+                </button>
               </div>
-              <div style={{ backgroundColor: C.white, border: `1.5px solid ${C.navy}`, borderRadius: "6px", padding: "1px 6px", marginTop: "2px", fontSize: "9px", fontWeight: 800, color: pin.color, whiteSpace: "nowrap", boxShadow: `1px 1px 0 ${C.navy}` }}>
-                {pin.label}
+              <p style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "#4B6898" }}>{locationStatus}</p>
+            </div>
+          )}
+
+          {mapTab === "地图" ? (
+            <div style={{ marginTop: "8px", padding: "10px", borderRadius: "10px", backgroundColor: C.white, border: `2px solid ${C.navy}`, boxShadow: `2px 2px 0 ${C.pale}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#4B6898" }}>{activeLocation?.type ?? "📍 Campus"}</span>
+                <span style={{ backgroundColor: C.ice, border: `1.5px solid ${C.navy}`, borderRadius: "999px", padding: "2px 8px", fontSize: "10px", fontWeight: 800, color: C.navy }}>
+                  {activeLocation?.time ?? "5–10 min"}
+                </span>
+              </div>
+              <p style={{ marginTop: "5px", fontSize: "14px", fontWeight: 900, color: C.navy }}>
+                {activeLocation?.title ?? "Campus Building"}
+              </p>
+              <p style={{ fontSize: "11px", fontWeight: 700, color: "#4B6898", marginTop: "2px" }}>
+                {activeLocation?.subtitle ?? ""}
+              </p>
+              <p style={{ marginTop: "7px", fontSize: "11px", lineHeight: 1.45, color: C.navy }}>
+                {activeLocation?.desc ?? ""}
+              </p>
+              <p style={{ marginTop: "6px", fontSize: "11px", lineHeight: 1.45, color: "#355087", fontWeight: 600 }}>
+                {activeLocation?.story ?? ""}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                {(activeLocation?.tags ?? []).map((tag) => (
+                  <span key={tag} style={{ backgroundColor: C.pale, border: `1.5px solid ${C.navy}`, borderRadius: "999px", padding: "1px 8px", fontSize: "10px", fontWeight: 800, color: C.navy }}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div style={{ marginTop: "8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                <div style={{ backgroundColor: C.cream, border: `1.5px solid ${C.pale}`, borderRadius: "8px", padding: "6px 8px" }}>
+                  <p style={{ fontSize: "10px", color: "#4B6898", fontWeight: 700 }}>Best for</p>
+                  <p style={{ fontSize: "11px", color: C.navy, fontWeight: 800, marginTop: "1px" }}>{activeLocation?.bestFor ?? "-"}</p>
+                </div>
+                <div style={{ backgroundColor: C.cream, border: `1.5px solid ${C.pale}`, borderRadius: "8px", padding: "6px 8px" }}>
+                  <p style={{ fontSize: "10px", color: "#4B6898", fontWeight: 700 }}>Access</p>
+                  <p style={{ fontSize: "11px", color: C.navy, fontWeight: 800, marginTop: "1px" }}>{activeLocation?.access ?? "-"}</p>
+                </div>
               </div>
             </div>
-          ))}
-          {mapTab === "实时定位" && (
-            <div style={{ position: "absolute", inset: 0, backgroundColor: `${C.royal}22`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-              <div style={{ width: "56px", height: "56px", backgroundColor: C.white, border: `3px solid ${C.royal}`, boxShadow: `3px 3px 0 ${C.navy}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1.2s ease-in-out infinite alternate" }}>
-                <IconNavigation size={24} color={C.royal} />
+          ) : (
+            <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "10px", backgroundColor: C.white, border: `2px solid ${C.pale}` }}>
+              <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: `2px solid ${C.navy}`, backgroundColor: C.royal, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <IconPin size={12} color={C.white} />
               </div>
-              <div style={{ backgroundColor: C.royal, border: `2px solid ${C.navy}`, borderRadius: "20px", padding: "4px 14px", fontSize: "12px", fontWeight: 800, color: C.white, boxShadow: `2px 2px 0 ${C.navy}` }}>
-                正在定位中…
-              </div>
-              <style>{`@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }`}</style>
+              <p style={{ fontSize: "11px", fontWeight: 700, color: C.navy }}>
+                地图数据来自 OpenStreetMap，定位需浏览器授权且建议在 HTTPS 环境使用。
+              </p>
             </div>
           )}
         </ComicCard>
